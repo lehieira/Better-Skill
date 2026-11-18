@@ -30,11 +30,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/5] Checking scripts exist & bash syntax..."
+echo "[1/5] Checking scripts exist, bash syntax, and Linux does NOT install PowerShell/Windows Terminal..."
 assert_exists "$DETECT_SH"
 assert_exists "$INSTALL_SH"
 bash -n "$DETECT_SH"
 bash -n "$INSTALL_SH"
+if grep -qE 'PowerShell/PowerShell/releases|powershell-.*-linux|libicu' "$INSTALL_SH"; then
+  echo "FAIL: install.sh must not install PowerShell 7 on Linux" >&2
+  exit 1
+fi
 
 echo "[2/5] Testing Linux Antigravity surface detection..."
 HOME_ALL="$TMP_ROOT/home_all"
@@ -112,11 +116,8 @@ assert_exists "$SANDBOX_WS/.agents/rules"
 assert_exists "$SANDBOX_WS/.agents/plugins"
 assert_exists "$SANDBOX_WS/.agents/AGENTS.md"
 assert_exists "$SANDBOX_HOME/.config/oh-my-posh/custom.omp.json"
-assert_exists "$SANDBOX_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
-
-# Ensure Pwsh profile on Linux does NOT use Windows backslashes
-if grep -q '\\' "$SANDBOX_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"; then
-  echo "FAIL: Backslash found in Linux PowerShell profile" >&2
+if [[ -e "$SANDBOX_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1" ]]; then
+  echo "FAIL: Linux install.sh must not create PowerShell profile when pwsh is not installed" >&2
   exit 1
 fi
 

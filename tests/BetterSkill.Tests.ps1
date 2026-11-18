@@ -178,4 +178,20 @@ Describe "Better-Skill Repository & Windows Installer" {
             $mergedVs.'terminal.integrated.fontFamily' | Should Be "FiraCode Nerd Font"
         }
     }
+
+    Context "AC-09: Windows-Only MSIX Bundle (Pwsh 7.7.0 & WT 1.25.3131.0)" {
+        It "configures exact GitHub .msixbundle URLs and Add-AppxPackage version checks in install.ps1" {
+            $psContent = [System.IO.File]::ReadAllText($InstallScript, [System.Text.Encoding]::UTF8)
+            $psContent | Should Match "https://github\.com/PowerShell/PowerShell/releases/download/v7\.7\.0/PowerShell-7\.7\.0\.msixbundle"
+            $psContent | Should Match "https://github\.com/microsoft/terminal/releases/download/v1\.25\.3131\.0/Microsoft\.WindowsTerminal_1\.25\.3131\.0_8wekyb3d8bbwe\.msixbundle"
+            $psContent | Should Match "Add-AppxPackage"
+        }
+
+        It "reports version-aware package plan cleanly in -DryRun mode" {
+            $dryOut = (& $InstallScript -DryRun *>&1 | Out-String)
+            $LASTEXITCODE | Should Be 0
+            $dryOut | Should Match "PowerShell 7\.7\.0"
+            $dryOut | Should Match "Windows Terminal 1\.25\.3131\.0"
+        }
+    }
 }

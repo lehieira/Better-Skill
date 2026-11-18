@@ -18,3 +18,8 @@
 ## Phase D: Convergence & GitHub Push
 - [x] T010 Chạy toàn bộ test suite trên Windows PowerShell 5.1, PowerShell 7 và WSL Ubuntu `bash` (`100% PASS`)
 - [x] T011 Quét secret/PII, chạy `validate_skills.ps1`, cập nhật `.antigravity/`, commit sạch và push lên `https://github.com/lehieira/Better-Skill.git`
+
+## Phase E: Windows-Only MSIXBundle (Pwsh 7.7.0 & WT 1.25.3131.0) & Linux Native Cleanup
+- [x] T012 [AC-06, AC-09] Cập nhật tests (`BetterSkill.Tests.ps1`, `test_linux.sh`) cho kiểm tra version `.msixbundle` trên Windows và bỏ `pwsh` trên Linux (Red)
+- [x] T013 [AC-09] Cập nhật `install.ps1` cài PowerShell 7.7.0 & Windows Terminal 1.25.3131.0 qua `.msixbundle` (`Add-AppxPackage` + fallback `winget`) với kiểm tra version
+- [x] T014 [AC-06] Cập nhật `install.sh` bỏ cài PowerShell 7 (`pwsh`/`libicu`) trên Linux, cập nhật `README.md`, chạy full test suites & push lên GitHub

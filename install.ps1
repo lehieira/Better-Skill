@@ -152,9 +152,10 @@ function Install-WingetPackageIfMissing {
         [string]$CommandName,
         [string]$WingetId,
         [string]$DisplayName,
-        [string[]]$FallbackPaths = @()
+        [string[]]$FallbackPaths = @(),
+        [switch]$ForceWinget
     )
-    if (Test-ToolAvailable -CommandName $CommandName -FallbackPaths $FallbackPaths) {
+    if (-not $ForceWinget -and (Test-ToolAvailable -CommandName $CommandName -FallbackPaths $FallbackPaths)) {
         Write-Ok "$DisplayName already installed"
         return $true
     }
@@ -171,6 +172,85 @@ function Install-WingetPackageIfMissing {
     }
     Write-WarnLine "$DisplayName installation completed with warning or requires restarting terminal."
     return $false
+}
+
+function Get-InstalledMsixOrToolVersion {
+    param(
+        [string]$AppxName,
+        [string]$CommandName = ""
+    )
+    try {
+        $pkg = Get-AppxPackage -Name $AppxName -ErrorAction SilentlyContinue | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
+        if ($pkg -and $pkg.Version) {
+            return ([version]$pkg.Version)
+        }
+    } catch {
+    }
+    if ($CommandName -eq "pwsh" -and -not $SkipCommandProbe) {
+        $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+        if ($cmd) {
+            try {
+                $verStr = (& pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>$null | Select-Object -First 1).Trim()
+                if ($verStr -match '^(\d+\.\d+\.\d+)') {
+                    return ([version]($Matches[1] + ".0"))
+                }
+            } catch {
+            }
+        }
+    }
+    return $null
+}
+
+function Install-MsixBundleIfNeeded {
+    param(
+        [string]$DisplayName,
+        [string]$AppxName,
+        [version]$MinVersion,
+        [string]$BundleUrl,
+        [string]$WingetId,
+        [string]$CommandName,
+        [string[]]$FallbackPaths = @()
+    )
+    $currentVer = Get-InstalledMsixOrToolVersion -AppxName $AppxName -CommandName $CommandName
+    if ($currentVer -and ($currentVer -ge $MinVersion)) {
+        Write-Ok "$DisplayName $currentVer already installed (>= $MinVersion)"
+        return $true
+    }
+
+    if ($DryRun) {
+        $currText = if ($currentVer) { "$currentVer" } else { "not installed" }
+        Write-Step "[DryRun] Would install/upgrade $DisplayName ($currText -> $MinVersion) from $BundleUrl (winget fallback: $WingetId)"
+        return $true
+    }
+
+    $tmpDir = Join-Path $env:TEMP ("BetterSkill-Pkg-" + [guid]::NewGuid().ToString("N"))
+    try {
+        Ensure-Dir $tmpDir
+        $fileName = [System.IO.Path]::GetFileName(($BundleUrl -split '\?')[0])
+        $bundlePath = Join-Path $tmpDir $fileName
+        Write-Step "Downloading $DisplayName ($MinVersion) from $BundleUrl..."
+        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -fSL --retry 2 -o $bundlePath $BundleUrl
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $bundlePath)) {
+                throw "curl.exe failed with exit code $LASTEXITCODE"
+            }
+        } else {
+            Invoke-WebRequest -Uri $BundleUrl -OutFile $bundlePath -UseBasicParsing
+        }
+
+        Write-Step "Installing $DisplayName via Add-AppxPackage..."
+        Add-AppxPackage -Path $bundlePath -ErrorAction Stop
+        Refresh-ProcessPath
+        Write-Ok "$DisplayName installed via MSIX bundle"
+        return $true
+    } catch {
+        Write-WarnLine "Add-AppxPackage failed for $DisplayName ($($_.Exception.Message)). Trying winget fallback ($WingetId)..."
+        return (Install-WingetPackageIfMissing -CommandName $CommandName -WingetId $WingetId -DisplayName $DisplayName -FallbackPaths $FallbackPaths -ForceWinget)
+    } finally {
+        if (Test-Path $tmpDir) {
+            Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Install-FiraCodeNerdFont {
@@ -515,28 +595,49 @@ try {
     }
 
     if (-not $SkillsOnly) {
-        if (-not $SkipPackageInstall -and -not $DryRun) {
-            Install-WingetPackageIfMissing -CommandName "git" -WingetId "Git.Git" -DisplayName "Git" | Out-Null
-            Install-WingetPackageIfMissing -CommandName "wt" -WingetId "Microsoft.WindowsTerminal" -DisplayName "Windows Terminal" -FallbackPaths @(
-                (Join-MultiPath @($LocalAppDataDir, "Microsoft", "WindowsApps", "wt.exe"))
-            ) | Out-Null
-            Install-WingetPackageIfMissing -CommandName "pwsh" -WingetId "Microsoft.PowerShell" -DisplayName "PowerShell 7" -FallbackPaths @(
-                (Join-MultiPath @($LocalAppDataDir, "Microsoft", "WindowsApps", "Microsoft.PowerShell_8wekyb3d8bbwe", "pwsh.exe")),
-                (Join-MultiPath @($env:ProgramFiles, "PowerShell", "7", "pwsh.exe"))
-            ) | Out-Null
-            $ompOk = Install-WingetPackageIfMissing -CommandName "oh-my-posh" -WingetId "JanDeDobbeleer.OhMyPosh" -DisplayName "Oh My Posh" -FallbackPaths @(
-                (Join-MultiPath @($LocalAppDataDir, "Programs", "oh-my-posh", "bin", "oh-my-posh.exe"))
-            )
-            if (-not $ompOk) {
-                try {
-                    Write-Step "Trying official Oh My Posh installer fallback..."
-                    Invoke-RestMethod https://ohmyposh.dev/install.ps1 | Invoke-Expression
-                    Refresh-ProcessPath
-                } catch {
-                    Write-WarnLine "Oh My Posh fallback failed: $($_.Exception.Message)"
-                }
+        if (-not $SkipPackageInstall) {
+            $wtBundleUrl = "https://github.com/microsoft/terminal/releases/download/v1.25.3131.0/Microsoft.WindowsTerminal_1.25.3131.0_8wekyb3d8bbwe.msixbundle"
+            $pwshBundleUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.7.0/PowerShell-7.7.0.msixbundle"
+
+            if (-not $DryRun) {
+                Install-WingetPackageIfMissing -CommandName "git" -WingetId "Git.Git" -DisplayName "Git" | Out-Null
             }
-            Install-FiraCodeNerdFont
+            Install-MsixBundleIfNeeded `
+                -DisplayName "Windows Terminal 1.25.3131.0" `
+                -AppxName "Microsoft.WindowsTerminal" `
+                -MinVersion ([version]"1.25.3131.0") `
+                -BundleUrl $wtBundleUrl `
+                -WingetId "Microsoft.WindowsTerminal" `
+                -CommandName "wt" `
+                -FallbackPaths @((Join-MultiPath @($LocalAppDataDir, "Microsoft", "WindowsApps", "wt.exe"))) | Out-Null
+
+            Install-MsixBundleIfNeeded `
+                -DisplayName "PowerShell 7.7.0" `
+                -AppxName "Microsoft.PowerShell" `
+                -MinVersion ([version]"7.7.0.0") `
+                -BundleUrl $pwshBundleUrl `
+                -WingetId "Microsoft.PowerShell" `
+                -CommandName "pwsh" `
+                -FallbackPaths @(
+                    (Join-MultiPath @($LocalAppDataDir, "Microsoft", "WindowsApps", "Microsoft.PowerShell_8wekyb3d8bbwe", "pwsh.exe")),
+                    (Join-MultiPath @($env:ProgramFiles, "PowerShell", "7", "pwsh.exe"))
+                ) | Out-Null
+
+            if (-not $DryRun) {
+                $ompOk = Install-WingetPackageIfMissing -CommandName "oh-my-posh" -WingetId "JanDeDobbeleer.OhMyPosh" -DisplayName "Oh My Posh" -FallbackPaths @(
+                    (Join-MultiPath @($LocalAppDataDir, "Programs", "oh-my-posh", "bin", "oh-my-posh.exe"))
+                )
+                if (-not $ompOk) {
+                    try {
+                        Write-Step "Trying official Oh My Posh installer fallback..."
+                        Invoke-RestMethod https://ohmyposh.dev/install.ps1 | Invoke-Expression
+                        Refresh-ProcessPath
+                    } catch {
+                        Write-WarnLine "Oh My Posh fallback failed: $($_.Exception.Message)"
+                    }
+                }
+                Install-FiraCodeNerdFont
+            }
         }
 
         $termSrc = Join-Path $sourceRoot "terminal"

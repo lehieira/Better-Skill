@@ -6,7 +6,7 @@
   - Đóng gói sạch `antigravity/` (`AGENTS.md`, `README.md`, `rules/`, `skills/`, `plugins/`) không chứa secret, PII hay đường dẫn cá nhân cứng.
   - Đóng gói `terminal/` (`custom.omp.json`, `PowerShell 7` & `Windows PowerShell` profiles, `Windows Terminal` template).
   - Module nhận diện bề mặt `scripts/detect-antigravity.ps1` và `scripts/detect-antigravity.sh` (CLI / Desktop App / IDE / VS Code extension).
-  - Bộ cài `install.ps1` (tương thích PS 5.1 & Pwsh 7, chạy cả local lẫn remote `irm | iex`) và `install.sh` (Ubuntu/Debian/Fedora/Arch, chạy cả local lẫn `curl | bash`).
+  - Bộ cài `install.ps1` (tương thích PS 5.1 & Pwsh 7, chạy cả local lẫn remote `irm | iex`; chỉ Windows cài PowerShell 7.7.0 & Windows Terminal 1.25.3131.0 qua `.msixbundle` `Add-AppxPackage` kèm fallback `winget`) và `install.sh` (Ubuntu/Debian/Fedora/Arch, chạy cả local lẫn `curl | bash`; chỉ cài Oh My Posh + FiraCode Nerd Font + `bash`/`zsh` + Antigravity assets, không cài PowerShell 7 hay Windows Terminal trên Linux).
   - Merge an toàn cấu hình cũ (backup `.bak.<timestamp>` trước khi ghi).
   - Bộ kiểm thử tự động (`tests/BetterSkill.Tests.ps1`, `tests/test_linux.sh`) + đẩy sạch lên `https://github.com/lehieira/Better-Skill.git`.
 - **Out-of-Scope**:
@@ -34,6 +34,7 @@
 - **AC-03**: Given máy Windows trống (isolated `$TargetHome`), When chạy `install.ps1 -TargetHome <tmp> -SkipPackageInstall`, Then tạo đủ `~/.gemini/config/{skills,plugins,rules}`, `~/.gemini/{skills,rules,AGENTS.md}`, `~/.config/oh-my-posh/custom.omp.json` và profiles PowerShell 7 + 5.1.
 - **AC-04**: Given file `settings.json` của Windows Terminal đã có sẵn profile `Ubuntu` và keybinding riêng, When chạy `install.ps1` (merge mode), Then tạo file `.bak.*`, giữ nguyên `Ubuntu` + keybinding cũ, thêm/cập nhật profile `/~` (`💫`, `FiraCode Nerd Font Mono`, size `10`, `semi-bold`) làm `defaultProfile` với đường dẫn `pwsh.exe` động.
 - **AC-05**: Given chạy `install.ps1` hoặc `install.sh` lần thứ 2 liên tiếp (idempotent), When kiểm tra PowerShell profile / `.bashrc`, Then block `oh-my-posh` chỉ xuất hiện đúng 1 lần.
-- **AC-06**: Given môi trường Linux (WSL Ubuntu `bash`), When chạy `install.sh --target-home <tmp> --skip-package-install`, Then cài đủ 24 global skills + 5 plugins + 9 rules + `custom.omp.json` + `~/.config/powershell/Microsoft.PowerShell_profile.ps1` + `.bashrc` hook với exit code `0`.
+- **AC-06**: Given môi trường Linux (WSL Ubuntu `bash`), When chạy `install.sh --target-home <tmp> --skip-package-install`, Then cài đủ 24 global skills + 5 plugins + 9 rules + `custom.omp.json` + `.bashrc` hook với exit code `0`, và không tự cài PowerShell 7 hay tạo PowerShell profile khi máy chưa có `pwsh`.
+- **AC-09**: Given môi trường Windows, When kiểm tra gói PowerShell 7 & Windows Terminal, Then `install.ps1` bỏ qua nếu đã có bản `>= 7.7.0.0` / `>= 1.25.3131.0`, còn nếu thiếu hoặc cũ hơn thì tải cài từ 2 URL `.msixbundle` chỉ định qua `Add-AppxPackage` (fallback `winget` nếu lỗi dependency).
 - **AC-07**: Given tham số `-Workspace <dir>` / `--workspace <dir>`, When chạy installer, Then tạo đủ `<dir>/.agents/{skills,rules,plugins,AGENTS.md}`.
 - **AC-08**: Given toàn bộ repo `Better-Skill`, When chạy bộ quét PII/Secret trong test suite, Then không phát hiện đường dẫn user cá nhân cứng, email/SĐT thật, token hay file nhạy cảm trước khi push lên GitHub.

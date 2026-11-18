@@ -1,6 +1,6 @@
 # Better-Skill 🚀
 
-Bộ cài đặt đa nền tảng (**Windows & Linux**) giúp triển khai nhanh toàn bộ hệ sinh thái **Antigravity Skills, Rules & Plugins** kèm **Terminal + PowerShell 7 + Oh My Posh + FiraCode Nerd Font + Custom Theme** lên bất kỳ máy tính nào.
+Bộ cài đặt đa nền tảng (**Windows & Linux**) giúp triển khai nhanh toàn bộ hệ sinh thái **Antigravity Skills, Rules & Plugins** kèm **Oh My Posh + FiraCode Nerd Font + Custom Theme** (và tự cài **Windows Terminal + PowerShell 7** trên Windows) lên bất kỳ máy tính nào.
 
 ---
 
@@ -34,8 +34,9 @@ curl -fsSL https://raw.githubusercontent.com/lehieira/Better-Skill/main/install.
    - **5 Specialized Plugins** (`~/.gemini/config/plugins/`): `fullstack-web-pro`, `devops-prod-ops`, `ai-agent-kit`, `java-enterprise-sql`, `data-browser-ops`.
 
 3. **Tự động cài & đồng bộ Terminal chuẩn đẹp (`custom.omp.json`)**:
-   - Tự cài **Windows Terminal** (Windows), **PowerShell 7 (`pwsh`)**, **Oh My Posh**, **FiraCode Nerd Font** và **Git**.
-   - **Safe Merge & Auto-Backup (`.bak.<timestamp>`)**: Giữ nguyên profile/keybinding/alias sẵn có của bạn; chỉ merge profile `/~` (`💫`) với `FiraCode Nerd Font Mono` size `10` semi-bold trên Windows Terminal, cùng hook `custom.omp.json` cho PowerShell 7 / Windows PowerShell / Bash / Zsh.
+   - **Chỉ trên Windows**: Tự kiểm tra version và cài trực tiếp qua `Add-AppxPackage` (có fallback `winget`) cho **Windows Terminal `1.25.3131.0`** ([`Microsoft.WindowsTerminal_1.25.3131.0_8wekyb3d8bbwe.msixbundle`](https://github.com/microsoft/terminal/releases/download/v1.25.3131.0/Microsoft.WindowsTerminal_1.25.3131.0_8wekyb3d8bbwe.msixbundle)) và **PowerShell `7.7.0`** ([`PowerShell-7.7.0.msixbundle`](https://github.com/PowerShell/PowerShell/releases/download/v7.7.0/PowerShell-7.7.0.msixbundle)), cùng **Oh My Posh**, **FiraCode Nerd Font** và **Git**; merge profile `/~` (`💫`) với `FiraCode Nerd Font Mono` size `10` semi-bold.
+   - **Trên Linux**: Không cài PowerShell 7 hay Windows Terminal; cài **Oh My Posh**, **FiraCode Nerd Font** và đồng bộ `custom.omp.json` cho `bash`/`zsh`.
+   - **Safe Merge & Auto-Backup (`.bak.<timestamp>`)**: Giữ nguyên profile/keybinding/alias sẵn có trên mọi máy.
 
 ---
 

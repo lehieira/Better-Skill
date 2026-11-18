@@ -153,14 +153,12 @@ install_linux_packages() {
   if command -v apt-get >/dev/null 2>&1; then
     run_sudo env DEBIAN_FRONTEND=noninteractive apt-get update -qq </dev/null
     run_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip fontconfig ca-certificates tar </dev/null
-    run_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libicu-dev </dev/null >/dev/null 2>&1 || true
   elif command -v dnf >/dev/null 2>&1; then
     run_sudo dnf install -y curl git unzip fontconfig ca-certificates tar </dev/null
-    run_sudo dnf install -y libicu </dev/null >/dev/null 2>&1 || true
   elif command -v pacman >/dev/null 2>&1; then
-    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar icu </dev/null
+    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar </dev/null
   elif command -v apk >/dev/null 2>&1; then
-    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash icu-libs </dev/null
+    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash </dev/null
   elif [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
     brew install git curl </dev/null
   fi
@@ -171,48 +169,10 @@ install_linux_packages() {
   fi
   mkdir -p "$bin_dir"
 
-  # PowerShell 7 (pwsh)
-  if ! command -v pwsh >/dev/null 2>&1; then
-    log_step "Installing PowerShell 7 (pwsh)..."
-    if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-      brew install --cask powershell || true
-    else
-      local arch pwsh_arch
-      arch="$(uname -m)"
-      case "$arch" in
-        x86_64|amd64) pwsh_arch="linux-x64" ;;
-        aarch64|arm64) pwsh_arch="linux-arm64" ;;
-        *) pwsh_arch="" ;;
-      esac
-      if [[ -n "$pwsh_arch" ]]; then
-        local pwsh_ver pwsh_url tmp_pwsh latest_url
-        latest_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/PowerShell/PowerShell/releases/latest 2>/dev/null || true)"
-        pwsh_ver="$(printf '%s' "$latest_url" | sed -nE 's#.*/tag/v([0-9.]+).*#\1#p')"
-        [[ -z "$pwsh_ver" ]] && pwsh_ver="7.4.6"
-        pwsh_url="https://github.com/PowerShell/PowerShell/releases/download/v${pwsh_ver}/powershell-${pwsh_ver}-${pwsh_arch}.tar.gz"
-        tmp_pwsh="$(mktemp -d)"
-        if curl -fsSL "$pwsh_url" -o "$tmp_pwsh/pwsh.tar.gz"; then
-          local pwsh_dir="$TARGET_HOME/.local/share/powershell"
-          mkdir -p "$pwsh_dir"
-          tar zxf "$tmp_pwsh/pwsh.tar.gz" -C "$pwsh_dir"
-          chmod +x "$pwsh_dir/pwsh"
-          ln -sf "$pwsh_dir/pwsh" "$bin_dir/pwsh"
-          export PATH="$bin_dir:$PATH"
-          log_ok "Installed PowerShell $pwsh_ver -> $bin_dir/pwsh"
-        else
-          log_warn "Could not download PowerShell 7 automatically; please install pwsh manually."
-        fi
-        rm -rf "$tmp_pwsh"
-      fi
-    fi
-  else
-    log_ok "PowerShell 7 already installed: $(command -v pwsh)"
-  fi
-
   # Oh My Posh
   if ! command -v oh-my-posh >/dev/null 2>&1 && [[ ! -x "$bin_dir/oh-my-posh" ]] && [[ ! -x "$TARGET_HOME/.local/bin/oh-my-posh" ]]; then
     log_step "Installing Oh My Posh..."
-    curl -fsSL https://ohmyposh.dev/install.sh | bash -s -- -d "$bin_dir"
+    curl -fsSL https://ohmyposh.dev/install.sh </dev/null | bash -s -- -d "$bin_dir"
     export PATH="$bin_dir:$PATH"
     log_ok "Installed Oh My Posh -> $bin_dir/oh-my-posh"
   else
@@ -411,9 +371,10 @@ EOF
       log_ok "Installed Oh My Posh theme -> $omp_dst"
     fi
 
-    local pwsh_prof="$TARGET_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
-    local pwsh_block
-    pwsh_block="$(cat <<'EOF'
+    if [[ "$SKIP_COMMAND_PROBE" != "1" ]] && command -v pwsh >/dev/null 2>&1; then
+      local pwsh_prof="$TARGET_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
+      local pwsh_block
+      pwsh_block="$(cat <<'EOF'
 # >>> Better-Skill Oh My Posh >>>
 $env:PATH = "$HOME/.local/bin:$env:PATH"
 $ompConfig = [System.IO.Path]::Combine($HOME, '.config', 'oh-my-posh', 'custom.omp.json')
@@ -423,7 +384,8 @@ if ((Get-Command oh-my-posh -ErrorAction SilentlyContinue) -and (Test-Path $ompC
 # <<< Better-Skill Oh My Posh <<<
 EOF
 )"
-    merge_marked_block "$pwsh_prof" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$pwsh_block"
+      merge_marked_block "$pwsh_prof" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$pwsh_block"
+    fi
 
     local bash_block
     bash_block="$(cat <<'EOF'
@@ -455,7 +417,7 @@ EOF
     merge_ide_json_settings "$ANTIGRAVITY_SETTINGS"
   fi
 
-  log_step "Done! Open a new terminal or run 'pwsh' to enjoy Better-Skill + Oh My Posh."
+  log_step "Done! Open a new terminal (or reload ~/.bashrc / ~/.zshrc) to enjoy Better-Skill + Oh My Posh."
 }
 
 main "$@"
