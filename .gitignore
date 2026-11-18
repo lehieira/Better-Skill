@@ -1,0 +1,29 @@
+# OS & Editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment & Secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+
+# Local state, backups, logs & DBs (secret-leak-prevention)
+*.bak
+*.bak.*
+*.log
+*.sqlite
+*.db
+*.csv
+*.sql
+*.dump
+logs/
+tmp/
+temp/
+backups/
+
+# Test scratch outputs
+TestResults/
+.pytest_cache/

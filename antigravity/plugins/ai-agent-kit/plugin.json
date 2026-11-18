@@ -1,0 +1,11 @@
+{
+  "name": "ai-agent-kit",
+  "displayName": "AI & Agent Engineering Kit",
+  "description": "Thiết kế Prompt có đánh giá benchmark (Evals), kiến trúc RAG truy xuất có trích dẫn và xây dựng MCP Server chuẩn xác.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Thiết kế system prompt, structured output schema và bộ test eval cho tính năng AI",
+    "Xây dựng kiến trúc RAG hybrid search + rerank có trích dẫn nguồn",
+    "Tạo custom MCP Server an toàn với JSON schema validation"
+  ]
+}

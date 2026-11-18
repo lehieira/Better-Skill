@@ -1,0 +1,11 @@
+{
+  "name": "devops-prod-ops",
+  "displayName": "DevOps & Production Ops",
+  "description": "Đóng gói Docker/Compose an toàn, tự động hóa CI/CD GitHub Actions, thiết kế logging/observability sạch PII và quy trình xử lý sự cố production.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Viết multi-stage Dockerfile an toàn với non-root user và docker-compose healthcheck",
+    "Thiết kế pipeline GitHub Actions lint, typecheck, test và security audit",
+    "Chuẩn hóa structured logging, request ID và healthcheck endpoints cho backend"
+  ]
+}

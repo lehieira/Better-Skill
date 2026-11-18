@@ -1,0 +1,11 @@
+{
+  "name": "java-enterprise-sql",
+  "displayName": "Java Enterprise & SQL Tuning",
+  "description": "Kiến trúc Java Web (Filter/Servlet/Service/DAO/JSP) bảo mật cao với Connection Pool, JDBC Transaction an toàn và tối ưu hóa truy vấn SQL Server/MySQL.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Kiến trúc lại Filter/Servlet/Service/DAO với PreparedStatement và Transaction JDBC",
+    "Audit bảo mật session, CSRF và XSS escaping trên ứng dụng Java JSP/Servlet",
+    "Tối ưu query SQL chậm, xử lý N+1 và chống deadlock khi trừ kho/thanh toán"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "fullstack-web-pro",
+  "displayName": "Fullstack Web Pro",
+  "description": "Bộ kỹ năng Next.js/React App Router, xác thực Auth/RBAC, tối ưu Core Web Vitals, Technical SEO và Motion UI chuyên sâu.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Thiết kế kiến trúc Next.js App Router và Server Actions cho tính năng mới",
+    "Audit Auth/RBAC, session cookie và phân quyền route phía server",
+    "Tối ưu Core Web Vitals (LCP/INP/CLS) và SEO structured data cho trang web"
+  ]
+}

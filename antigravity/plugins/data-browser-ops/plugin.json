@@ -1,0 +1,11 @@
+{
+  "name": "data-browser-ops",
+  "displayName": "Data ETL, E2E & Load Testing",
+  "description": "Xử lý dữ liệu CSV/Excel an toàn (streaming & chống Formula Injection), tự động hóa E2E Playwright bền vững và load test API bằng k6.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Xây dựng pipeline import/export CSV/Excel theo chunk có validate schema và chống Formula Injection",
+    "Viết bộ test E2E Playwright theo Page Object Model không bị flaky",
+    "Tạo kịch bản load test API bằng k6 để đo p95/p99 latency và tìm ngưỡng chịu tải"
+  ]
+}
