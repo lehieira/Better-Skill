@@ -21,23 +21,23 @@ evidence=""
 # 1. Antigravity CLI
 if cmd_exists agy; then
   cli_detected="true"
-  evidence="${evidence}cli:cmd:agy;"
+  evidence="${evidence}cli:cmd:agy,"
 fi
 if [[ -x "$TARGET_HOME/.local/bin/agy" ]] || [[ -d "$TARGET_HOME/.gemini/antigravity-cli" ]]; then
   cli_detected="true"
-  evidence="${evidence}cli:dir;"
+  evidence="${evidence}cli:dir,"
 fi
 
 # 2. Antigravity Desktop App
 if [[ -d "$TARGET_HOME/.gemini/antigravity" ]] || [[ -d "$TARGET_HOME/.config/Antigravity" ]] || [[ -d "$TARGET_HOME/Library/Application Support/Antigravity" ]] || [[ -d "/opt/Antigravity" ]] || cmd_exists antigravity; then
   app_detected="true"
-  evidence="${evidence}app;"
+  evidence="${evidence}app,"
 fi
 
 # 3. Antigravity IDE
 if [[ -d "$TARGET_HOME/.gemini/antigravity-ide" ]] || [[ -d "$TARGET_HOME/.config/Antigravity IDE" ]] || [[ -d "$TARGET_HOME/Library/Application Support/Antigravity IDE" ]] || cmd_exists antigravity-ide; then
   ide_detected="true"
-  evidence="${evidence}ide;"
+  evidence="${evidence}ide,"
 fi
 
 # 4. VS Code & Extensions
@@ -50,7 +50,7 @@ for ext_dir in "$TARGET_HOME/.vscode/extensions" "$TARGET_HOME/.vscode-insiders/
     vscode_installed="true"
     if find "$ext_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -qiE '(antigravity|google\.gemini|gemini-code-assist|codeium)'; then
       vscode_ext="true"
-      evidence="${evidence}vscode-ext:dir;"
+      evidence="${evidence}vscode-ext:dir,"
     fi
   fi
 done
@@ -58,7 +58,7 @@ done
 if cmd_exists code; then
   if code --list-extensions 2>/dev/null | grep -qiE '(antigravity|google\.gemini|gemini-code-assist|codeium)'; then
     vscode_ext="true"
-    evidence="${evidence}vscode-ext:cli;"
+    evidence="${evidence}vscode-ext:cli,"
   fi
 fi
 
@@ -70,11 +70,11 @@ else
   ag_settings="$TARGET_HOME/.config/Antigravity/User/settings.json"
 fi
 
-echo "CLI=$cli_detected"
-echo "APP=$app_detected"
-echo "IDE=$ide_detected"
-echo "VSCODE_INSTALLED=$vscode_installed"
-echo "VSCODE_EXT=$vscode_ext"
-echo "VSCODE_SETTINGS=$vscode_settings"
-echo "ANTIGRAVITY_SETTINGS=$ag_settings"
-echo "EVIDENCE=$evidence"
+printf 'CLI=%s\n' "$cli_detected"
+printf 'APP=%s\n' "$app_detected"
+printf 'IDE=%s\n' "$ide_detected"
+printf 'VSCODE_INSTALLED=%s\n' "$vscode_installed"
+printf 'VSCODE_EXT=%s\n' "$vscode_ext"
+printf 'VSCODE_SETTINGS=%s\n' "$vscode_settings"
+printf 'ANTIGRAVITY_SETTINGS=%s\n' "$ag_settings"
+printf 'EVIDENCE=%s\n' "${evidence%,}"

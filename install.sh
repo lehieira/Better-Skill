@@ -198,15 +198,23 @@ install_linux_packages() {
   if command -v apt-get >/dev/null 2>&1; then
     run_sudo apt-get update -qq
     run_sudo apt-get install -y -qq curl git unzip fontconfig ca-certificates tar
+    run_sudo apt-get install -y -qq libicu-dev >/dev/null 2>&1 || true
   elif command -v dnf >/dev/null 2>&1; then
     run_sudo dnf install -y curl git unzip fontconfig ca-certificates tar
+    run_sudo dnf install -y libicu >/dev/null 2>&1 || true
   elif command -v pacman >/dev/null 2>&1; then
-    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar
+    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar icu
   elif command -v apk >/dev/null 2>&1; then
-    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash
+    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash icu-libs
   elif [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
     brew install git curl
   fi
+
+  local bin_dir="$TARGET_HOME/.local/bin"
+  if [[ "$(id -u)" -eq 0 ]] && [[ -d /usr/local/bin ]]; then
+    bin_dir="/usr/local/bin"
+  fi
+  mkdir -p "$bin_dir"
 
   # PowerShell 7 (pwsh)
   if ! command -v pwsh >/dev/null 2>&1; then
@@ -222,19 +230,20 @@ install_linux_packages() {
         *) pwsh_arch="" ;;
       esac
       if [[ -n "$pwsh_arch" ]]; then
-        local pwsh_ver pwsh_url tmp_pwsh
-        pwsh_ver="$(curl -fsSL https://api.github.com/repos/PowerShell/PowerShell/releases/latest | grep -oE '"tag_name":\s*"v[^"]+"' | head -n1 | sed -E 's/.*"v([^"]+)".*/\1/' || true)"
+        local pwsh_ver pwsh_url tmp_pwsh latest_url
+        latest_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/PowerShell/PowerShell/releases/latest 2>/dev/null || true)"
+        pwsh_ver="$(printf '%s' "$latest_url" | sed -nE 's#.*/tag/v([0-9.]+).*#\1#p')"
         [[ -z "$pwsh_ver" ]] && pwsh_ver="7.4.6"
         pwsh_url="https://github.com/PowerShell/PowerShell/releases/download/v${pwsh_ver}/powershell-${pwsh_ver}-${pwsh_arch}.tar.gz"
         tmp_pwsh="$(mktemp -d)"
         if curl -fsSL "$pwsh_url" -o "$tmp_pwsh/pwsh.tar.gz"; then
           local pwsh_dir="$TARGET_HOME/.local/share/powershell"
-          mkdir -p "$pwsh_dir" "$TARGET_HOME/.local/bin"
+          mkdir -p "$pwsh_dir"
           tar zxf "$tmp_pwsh/pwsh.tar.gz" -C "$pwsh_dir"
           chmod +x "$pwsh_dir/pwsh"
-          ln -sf "$pwsh_dir/pwsh" "$TARGET_HOME/.local/bin/pwsh"
-          export PATH="$TARGET_HOME/.local/bin:$PATH"
-          log_ok "Installed PowerShell $pwsh_ver -> $TARGET_HOME/.local/bin/pwsh"
+          ln -sf "$pwsh_dir/pwsh" "$bin_dir/pwsh"
+          export PATH="$bin_dir:$PATH"
+          log_ok "Installed PowerShell $pwsh_ver -> $bin_dir/pwsh"
         else
           log_warn "Could not download PowerShell 7 automatically; please install pwsh manually."
         fi
@@ -246,12 +255,11 @@ install_linux_packages() {
   fi
 
   # Oh My Posh
-  if ! command -v oh-my-posh >/dev/null 2>&1 && [[ ! -x "$TARGET_HOME/.local/bin/oh-my-posh" ]]; then
+  if ! command -v oh-my-posh >/dev/null 2>&1 && [[ ! -x "$bin_dir/oh-my-posh" ]] && [[ ! -x "$TARGET_HOME/.local/bin/oh-my-posh" ]]; then
     log_step "Installing Oh My Posh..."
-    mkdir -p "$TARGET_HOME/.local/bin"
-    curl -fsSL https://ohmyposh.dev/install.sh | bash -s -- -d "$TARGET_HOME/.local/bin"
-    export PATH="$TARGET_HOME/.local/bin:$PATH"
-    log_ok "Installed Oh My Posh -> $TARGET_HOME/.local/bin/oh-my-posh"
+    curl -fsSL https://ohmyposh.dev/install.sh | bash -s -- -d "$bin_dir"
+    export PATH="$bin_dir:$PATH"
+    log_ok "Installed Oh My Posh -> $bin_dir/oh-my-posh"
   else
     log_ok "Oh My Posh already installed"
   fi
@@ -356,7 +364,26 @@ if [[ -z "$SOURCE_ROOT" ]] || [[ ! -d "$SOURCE_ROOT/antigravity" ]]; then
 fi
 
 DETECT_OUT="$(TARGET_HOME="$TARGET_HOME" SKIP_COMMAND_PROBE="$SKIP_COMMAND_PROBE" bash "$SOURCE_ROOT/scripts/detect-antigravity.sh")"
-eval "$DETECT_OUT"
+CLI="false"
+APP="false"
+IDE="false"
+VSCODE_INSTALLED="false"
+VSCODE_EXT="false"
+VSCODE_SETTINGS=""
+ANTIGRAVITY_SETTINGS=""
+EVIDENCE=""
+while IFS='=' read -r key val; do
+  case "$key" in
+    CLI) CLI="$val" ;;
+    APP) APP="$val" ;;
+    IDE) IDE="$val" ;;
+    VSCODE_INSTALLED) VSCODE_INSTALLED="$val" ;;
+    VSCODE_EXT) VSCODE_EXT="$val" ;;
+    VSCODE_SETTINGS) VSCODE_SETTINGS="$val" ;;
+    ANTIGRAVITY_SETTINGS) ANTIGRAVITY_SETTINGS="$val" ;;
+    EVIDENCE) EVIDENCE="$val" ;;
+  esac
+done <<< "$DETECT_OUT"
 
 log_step "Detected Antigravity surfaces:"
 echo "  - Antigravity CLI           : $CLI"

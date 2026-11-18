@@ -30,11 +30,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/3] Checking scripts exist..."
+echo "[1/4] Checking scripts exist & bash syntax..."
 assert_exists "$DETECT_SH"
 assert_exists "$INSTALL_SH"
+bash -n "$DETECT_SH"
+bash -n "$INSTALL_SH"
 
-echo "[2/3] Testing Linux Antigravity surface detection..."
+echo "[2/4] Testing Linux Antigravity surface detection..."
 HOME_ALL="$TMP_ROOT/home_all"
 mkdir -p "$HOME_ALL/.gemini/antigravity-cli" \
          "$HOME_ALL/.gemini/antigravity" \
@@ -55,7 +57,22 @@ DETECT_NONE="$(TARGET_HOME="$HOME_NONE" SKIP_COMMAND_PROBE=1 bash "$DETECT_SH")"
 echo "$DETECT_NONE" | grep -q "CLI=false" || { echo "FAIL: false positive CLI"; exit 1; }
 echo "$DETECT_NONE" | grep -q "VSCODE_EXT=false" || { echo "FAIL: false positive VSCODE_EXT"; exit 1; }
 
-echo "[3/3] Testing Linux install.sh sandbox, safe merge & idempotency..."
+echo "[3/4] Testing Linux install.sh with ALL surfaces detected (multi-evidence regression)..."
+SANDBOX_MULTI="$TMP_ROOT/sandbox_multi"
+mkdir -p "$SANDBOX_MULTI/.gemini/antigravity-cli" \
+         "$SANDBOX_MULTI/.gemini/antigravity" \
+         "$SANDBOX_MULTI/.gemini/antigravity-ide" \
+         "$SANDBOX_MULTI/.local/bin" \
+         "$SANDBOX_MULTI/.vscode/extensions/google.antigravity-1.0.0"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SANDBOX_MULTI/.local/bin/agy"
+chmod +x "$SANDBOX_MULTI/.local/bin/agy"
+
+MULTI_OUT="$(PATH="$SANDBOX_MULTI/.local/bin:$PATH" bash "$INSTALL_SH" --target-home "$SANDBOX_MULTI" --skip-package-install --dry-run)"
+echo "$MULTI_OUT" | grep -q "Antigravity CLI           : true" || { echo "FAIL: multi-surface CLI not true"; exit 1; }
+echo "$MULTI_OUT" | grep -q "Antigravity Desktop App   : true" || { echo "FAIL: multi-surface APP not true"; exit 1; }
+echo "$MULTI_OUT" | grep -q "Antigravity IDE           : true" || { echo "FAIL: multi-surface IDE not true"; exit 1; }
+
+echo "[4/4] Testing Linux install.sh sandbox, safe merge & idempotency..."
 SANDBOX_HOME="$TMP_ROOT/sandbox_home"
 SANDBOX_WS="$TMP_ROOT/workspace"
 mkdir -p "$SANDBOX_HOME/.config/Code/User" "$SANDBOX_HOME/.vscode/extensions/google.antigravity-0.2.0" "$SANDBOX_WS"
