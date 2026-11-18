@@ -56,7 +56,7 @@ for ext_dir in "$TARGET_HOME/.vscode/extensions" "$TARGET_HOME/.vscode-insiders/
 done
 
 if cmd_exists code; then
-  if code --list-extensions 2>/dev/null | grep -qiE '(antigravity|google\.gemini|gemini-code-assist|codeium)'; then
+  if code --list-extensions </dev/null 2>/dev/null | grep -qiE '(antigravity|google\.gemini|gemini-code-assist|codeium)'; then
     vscode_ext="true"
     evidence="${evidence}vscode-ext:cli,"
   fi

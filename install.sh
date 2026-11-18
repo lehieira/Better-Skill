@@ -10,51 +10,6 @@ SKIP_PACKAGE_INSTALL=0
 DRY_RUN=0
 SKIP_COMMAND_PROBE="${SKIP_COMMAND_PROBE:-0}"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --target-home)
-      TARGET_HOME="$2"
-      shift 2
-      ;;
-    --workspace)
-      WORKSPACE="$2"
-      shift 2
-      ;;
-    --skills-only)
-      SKILLS_ONLY=1
-      shift
-      ;;
-    --terminal-only)
-      TERMINAL_ONLY=1
-      shift
-      ;;
-    --skip-package-install)
-      SKIP_PACKAGE_INSTALL=1
-      shift
-      ;;
-    --dry-run)
-      DRY_RUN=1
-      shift
-      ;;
-    -h|--help)
-      cat <<'EOF'
-Usage: install.sh [options]
-  --target-home <dir>      Target home directory (default: $HOME)
-  --workspace <dir>        Also install .agents/ into a project workspace
-  --skills-only            Only install Antigravity skills, rules, and plugins
-  --terminal-only          Only install PowerShell 7, Oh My Posh, theme, and Nerd Font
-  --skip-package-install   Skip apt/dnf/pacman package & font downloads
-  --dry-run                Print planned actions without writing files
-EOF
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      exit 1
-      ;;
-  esac
-done
-
 log_step() { printf '\033[36m[Better-Skill]\033[0m %s\n' "$1"; }
 log_ok()   { printf '  \033[32m[OK]\033[0m %s\n' "$1"; }
 log_warn() { printf '  \033[33m[WARN]\033[0m %s\n' "$1"; }
@@ -196,18 +151,18 @@ install_linux_packages() {
 
   log_step "Installing dependencies (curl, git, unzip, fontconfig) for distro: $os_id"
   if command -v apt-get >/dev/null 2>&1; then
-    run_sudo apt-get update -qq
-    run_sudo apt-get install -y -qq curl git unzip fontconfig ca-certificates tar
-    run_sudo apt-get install -y -qq libicu-dev >/dev/null 2>&1 || true
+    run_sudo env DEBIAN_FRONTEND=noninteractive apt-get update -qq </dev/null
+    run_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git unzip fontconfig ca-certificates tar </dev/null
+    run_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libicu-dev </dev/null >/dev/null 2>&1 || true
   elif command -v dnf >/dev/null 2>&1; then
-    run_sudo dnf install -y curl git unzip fontconfig ca-certificates tar
-    run_sudo dnf install -y libicu >/dev/null 2>&1 || true
+    run_sudo dnf install -y curl git unzip fontconfig ca-certificates tar </dev/null
+    run_sudo dnf install -y libicu </dev/null >/dev/null 2>&1 || true
   elif command -v pacman >/dev/null 2>&1; then
-    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar icu
+    run_sudo pacman -Sy --noconfirm --needed curl git unzip fontconfig tar icu </dev/null
   elif command -v apk >/dev/null 2>&1; then
-    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash icu-libs
+    run_sudo apk add --no-cache curl git unzip fontconfig ca-certificates tar bash icu-libs </dev/null
   elif [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-    brew install git curl
+    brew install git curl </dev/null
   fi
 
   local bin_dir="$TARGET_HOME/.local/bin"
@@ -343,73 +298,122 @@ cleanup() {
     rm -rf "$TEMP_BOOTSTRAP"
   fi
 }
-trap cleanup EXIT
 
-SCRIPT_DIR=""
-if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]}" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-fi
+main() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --target-home)
+        TARGET_HOME="$2"
+        shift 2
+        ;;
+      --workspace)
+        WORKSPACE="$2"
+        shift 2
+        ;;
+      --skills-only)
+        SKILLS_ONLY=1
+        shift
+        ;;
+      --terminal-only)
+        TERMINAL_ONLY=1
+        shift
+        ;;
+      --skip-package-install)
+        SKIP_PACKAGE_INSTALL=1
+        shift
+        ;;
+      --dry-run)
+        DRY_RUN=1
+        shift
+        ;;
+      -h|--help)
+        cat <<'EOF'
+Usage: install.sh [options]
+  --target-home <dir>      Target home directory (default: $HOME)
+  --workspace <dir>        Also install .agents/ into a project workspace
+  --skills-only            Only install Antigravity skills, rules, and plugins
+  --terminal-only          Only install PowerShell 7, Oh My Posh, theme, and Nerd Font
+  --skip-package-install   Skip apt/dnf/pacman package & font downloads
+  --dry-run                Print planned actions without writing files
+EOF
+        exit 0
+        ;;
+      *)
+        echo "Unknown option: $1" >&2
+        exit 1
+        ;;
+    esac
+  done
 
-SOURCE_ROOT="$SCRIPT_DIR"
-if [[ -z "$SOURCE_ROOT" ]] || [[ ! -d "$SOURCE_ROOT/antigravity" ]]; then
-  log_step "Bootstrapping Better-Skill bundle from GitHub..."
-  TEMP_BOOTSTRAP="$(mktemp -d)"
-  curl -fsSL "$REPO_TAR_URL" -o "$TEMP_BOOTSTRAP/bundle.tar.gz"
-  tar -xzf "$TEMP_BOOTSTRAP/bundle.tar.gz" -C "$TEMP_BOOTSTRAP"
-  SOURCE_ROOT="$(find "$TEMP_BOOTSTRAP" -mindepth 1 -maxdepth 1 -type d | head -n1)"
-  if [[ -z "$SOURCE_ROOT" ]] || [[ ! -d "$SOURCE_ROOT/antigravity" ]]; then
-    echo "Failed to extract Better-Skill bundle." >&2
-    exit 1
-  fi
-fi
+  trap cleanup EXIT
 
-DETECT_OUT="$(TARGET_HOME="$TARGET_HOME" SKIP_COMMAND_PROBE="$SKIP_COMMAND_PROBE" bash "$SOURCE_ROOT/scripts/detect-antigravity.sh")"
-CLI="false"
-APP="false"
-IDE="false"
-VSCODE_INSTALLED="false"
-VSCODE_EXT="false"
-VSCODE_SETTINGS=""
-ANTIGRAVITY_SETTINGS=""
-EVIDENCE=""
-while IFS='=' read -r key val; do
-  case "$key" in
-    CLI) CLI="$val" ;;
-    APP) APP="$val" ;;
-    IDE) IDE="$val" ;;
-    VSCODE_INSTALLED) VSCODE_INSTALLED="$val" ;;
-    VSCODE_EXT) VSCODE_EXT="$val" ;;
-    VSCODE_SETTINGS) VSCODE_SETTINGS="$val" ;;
-    ANTIGRAVITY_SETTINGS) ANTIGRAVITY_SETTINGS="$val" ;;
-    EVIDENCE) EVIDENCE="$val" ;;
-  esac
-done <<< "$DETECT_OUT"
-
-log_step "Detected Antigravity surfaces:"
-echo "  - Antigravity CLI           : $CLI"
-echo "  - Antigravity Desktop App   : $APP"
-echo "  - Antigravity IDE           : $IDE"
-echo "  - VS Code + Antigravity Ext : $VSCODE_EXT (VS Code installed: $VSCODE_INSTALLED)"
-
-if [[ "$TERMINAL_ONLY" == "0" ]]; then
-  install_antigravity_assets "$SOURCE_ROOT"
-fi
-
-if [[ "$SKILLS_ONLY" == "0" ]]; then
-  if [[ "$SKIP_PACKAGE_INSTALL" == "0" ]] && [[ "$DRY_RUN" == "0" ]]; then
-    install_linux_packages
+  local script_dir=""
+  if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]}" ]]; then
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   fi
 
-  OMP_DST="$TARGET_HOME/.config/oh-my-posh/custom.omp.json"
-  if [[ "$DRY_RUN" == "0" ]]; then
-    mkdir -p "$(dirname "$OMP_DST")"
-    backup_if_exists_diff "$SOURCE_ROOT/terminal/oh-my-posh/custom.omp.json" "$OMP_DST"
-    cp "$SOURCE_ROOT/terminal/oh-my-posh/custom.omp.json" "$OMP_DST"
-    log_ok "Installed Oh My Posh theme -> $OMP_DST"
+  local source_root="${BETTER_SKILL_SOURCE_DIR:-$script_dir}"
+  if [[ -z "$source_root" ]] || [[ ! -d "$source_root/antigravity" ]]; then
+    log_step "Bootstrapping Better-Skill bundle from GitHub..."
+    TEMP_BOOTSTRAP="$(mktemp -d)"
+    curl -fsSL "$REPO_TAR_URL" -o "$TEMP_BOOTSTRAP/bundle.tar.gz" </dev/null
+    tar -xzf "$TEMP_BOOTSTRAP/bundle.tar.gz" -C "$TEMP_BOOTSTRAP"
+    source_root="$(find "$TEMP_BOOTSTRAP" -mindepth 1 -maxdepth 1 -type d | head -n1)"
+    if [[ -z "$source_root" ]] || [[ ! -d "$source_root/antigravity" ]]; then
+      echo "Failed to extract Better-Skill bundle." >&2
+      exit 1
+    fi
   fi
 
-  PWSH_PROF="$TARGET_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
-  PWSH_BLOCK="$(cat <<'EOF'
+  local detect_out
+  detect_out="$(TARGET_HOME="$TARGET_HOME" SKIP_COMMAND_PROBE="$SKIP_COMMAND_PROBE" bash "$source_root/scripts/detect-antigravity.sh" </dev/null)"
+  CLI="false"
+  APP="false"
+  IDE="false"
+  VSCODE_INSTALLED="false"
+  VSCODE_EXT="false"
+  VSCODE_SETTINGS=""
+  ANTIGRAVITY_SETTINGS=""
+  EVIDENCE=""
+  while IFS='=' read -r key val; do
+    case "$key" in
+      CLI) CLI="$val" ;;
+      APP) APP="$val" ;;
+      IDE) IDE="$val" ;;
+      VSCODE_INSTALLED) VSCODE_INSTALLED="$val" ;;
+      VSCODE_EXT) VSCODE_EXT="$val" ;;
+      VSCODE_SETTINGS) VSCODE_SETTINGS="$val" ;;
+      ANTIGRAVITY_SETTINGS) ANTIGRAVITY_SETTINGS="$val" ;;
+      EVIDENCE) EVIDENCE="$val" ;;
+    esac
+  done <<< "$detect_out"
+
+  log_step "Detected Antigravity surfaces:"
+  echo "  - Antigravity CLI           : $CLI"
+  echo "  - Antigravity Desktop App   : $APP"
+  echo "  - Antigravity IDE           : $IDE"
+  echo "  - VS Code + Antigravity Ext : $VSCODE_EXT (VS Code installed: $VSCODE_INSTALLED)"
+
+  if [[ "$TERMINAL_ONLY" == "0" ]]; then
+    install_antigravity_assets "$source_root"
+  fi
+
+  if [[ "$SKILLS_ONLY" == "0" ]]; then
+    if [[ "$SKIP_PACKAGE_INSTALL" == "0" ]] && [[ "$DRY_RUN" == "0" ]]; then
+      install_linux_packages
+    fi
+
+    local omp_dst="$TARGET_HOME/.config/oh-my-posh/custom.omp.json"
+    if [[ "$DRY_RUN" == "0" ]]; then
+      mkdir -p "$(dirname "$omp_dst")"
+      backup_if_exists_diff "$source_root/terminal/oh-my-posh/custom.omp.json" "$omp_dst"
+      cp "$source_root/terminal/oh-my-posh/custom.omp.json" "$omp_dst"
+      log_ok "Installed Oh My Posh theme -> $omp_dst"
+    fi
+
+    local pwsh_prof="$TARGET_HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
+    local pwsh_block
+    pwsh_block="$(cat <<'EOF'
 # >>> Better-Skill Oh My Posh >>>
 $env:PATH = "$HOME/.local/bin:$env:PATH"
 $ompConfig = [System.IO.Path]::Combine($HOME, '.config', 'oh-my-posh', 'custom.omp.json')
@@ -419,9 +423,10 @@ if ((Get-Command oh-my-posh -ErrorAction SilentlyContinue) -and (Test-Path $ompC
 # <<< Better-Skill Oh My Posh <<<
 EOF
 )"
-  merge_marked_block "$PWSH_PROF" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$PWSH_BLOCK"
+    merge_marked_block "$pwsh_prof" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$pwsh_block"
 
-  BASH_BLOCK="$(cat <<'EOF'
+    local bash_block
+    bash_block="$(cat <<'EOF'
 # >>> Better-Skill Oh My Posh >>>
 export PATH="$HOME/.local/bin:$PATH"
 if command -v oh-my-posh >/dev/null 2>&1 && [ -f "$HOME/.config/oh-my-posh/custom.omp.json" ]; then
@@ -430,10 +435,11 @@ fi
 # <<< Better-Skill Oh My Posh <<<
 EOF
 )"
-  merge_marked_block "$TARGET_HOME/.bashrc" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$BASH_BLOCK"
+    merge_marked_block "$TARGET_HOME/.bashrc" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$bash_block"
 
-  if [[ -f "$TARGET_HOME/.zshrc" ]] || { [[ "$SKIP_COMMAND_PROBE" != "1" ]] && command -v zsh >/dev/null 2>&1; }; then
-    ZSH_BLOCK="$(cat <<'EOF'
+    if [[ -f "$TARGET_HOME/.zshrc" ]] || { [[ "$SKIP_COMMAND_PROBE" != "1" ]] && command -v zsh >/dev/null 2>&1; }; then
+      local zsh_block
+      zsh_block="$(cat <<'EOF'
 # >>> Better-Skill Oh My Posh >>>
 export PATH="$HOME/.local/bin:$PATH"
 if command -v oh-my-posh >/dev/null 2>&1 && [ -f "$HOME/.config/oh-my-posh/custom.omp.json" ]; then
@@ -442,11 +448,14 @@ fi
 # <<< Better-Skill Oh My Posh <<<
 EOF
 )"
-    merge_marked_block "$TARGET_HOME/.zshrc" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$ZSH_BLOCK"
+      merge_marked_block "$TARGET_HOME/.zshrc" "# >>> Better-Skill Oh My Posh >>>" "# <<< Better-Skill Oh My Posh <<<" "$zsh_block"
+    fi
+
+    merge_ide_json_settings "$VSCODE_SETTINGS"
+    merge_ide_json_settings "$ANTIGRAVITY_SETTINGS"
   fi
 
-  merge_ide_json_settings "$VSCODE_SETTINGS"
-  merge_ide_json_settings "$ANTIGRAVITY_SETTINGS"
-fi
+  log_step "Done! Open a new terminal or run 'pwsh' to enjoy Better-Skill + Oh My Posh."
+}
 
-log_step "Done! Open a new terminal or run 'pwsh' to enjoy Better-Skill + Oh My Posh."
+main "$@"

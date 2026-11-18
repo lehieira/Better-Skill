@@ -30,13 +30,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/4] Checking scripts exist & bash syntax..."
+echo "[1/5] Checking scripts exist & bash syntax..."
 assert_exists "$DETECT_SH"
 assert_exists "$INSTALL_SH"
 bash -n "$DETECT_SH"
 bash -n "$INSTALL_SH"
 
-echo "[2/4] Testing Linux Antigravity surface detection..."
+echo "[2/5] Testing Linux Antigravity surface detection..."
 HOME_ALL="$TMP_ROOT/home_all"
 mkdir -p "$HOME_ALL/.gemini/antigravity-cli" \
          "$HOME_ALL/.gemini/antigravity" \
@@ -57,7 +57,7 @@ DETECT_NONE="$(TARGET_HOME="$HOME_NONE" SKIP_COMMAND_PROBE=1 bash "$DETECT_SH")"
 echo "$DETECT_NONE" | grep -q "CLI=false" || { echo "FAIL: false positive CLI"; exit 1; }
 echo "$DETECT_NONE" | grep -q "VSCODE_EXT=false" || { echo "FAIL: false positive VSCODE_EXT"; exit 1; }
 
-echo "[3/4] Testing Linux install.sh with ALL surfaces detected (multi-evidence regression)..."
+echo "[3/5] Testing Linux install.sh with ALL surfaces detected (multi-evidence regression)..."
 SANDBOX_MULTI="$TMP_ROOT/sandbox_multi"
 mkdir -p "$SANDBOX_MULTI/.gemini/antigravity-cli" \
          "$SANDBOX_MULTI/.gemini/antigravity" \
@@ -72,7 +72,20 @@ echo "$MULTI_OUT" | grep -q "Antigravity CLI           : true" || { echo "FAIL: 
 echo "$MULTI_OUT" | grep -q "Antigravity Desktop App   : true" || { echo "FAIL: multi-surface APP not true"; exit 1; }
 echo "$MULTI_OUT" | grep -q "Antigravity IDE           : true" || { echo "FAIL: multi-surface IDE not true"; exit 1; }
 
-echo "[4/4] Testing Linux install.sh sandbox, safe merge & idempotency..."
+echo "[4/5] Testing piped stdin execution (curl | bash simulation with stdin-draining 'code' stub)..."
+SANDBOX_PIPE="$TMP_ROOT/sandbox_pipe"
+mkdir -p "$SANDBOX_PIPE/bin"
+cat > "$SANDBOX_PIPE/bin/code" <<'EOF'
+#!/usr/bin/env bash
+cat >/dev/null || true
+echo "google.antigravity"
+EOF
+chmod +x "$SANDBOX_PIPE/bin/code"
+PIPE_LOCAL_OUT="$(cat "$INSTALL_SH" | PATH="$SANDBOX_PIPE/bin:$PATH" BETTER_SKILL_SOURCE_DIR="$REPO_ROOT" bash -s -- --target-home "$SANDBOX_PIPE" --skip-package-install)"
+echo "$PIPE_LOCAL_OUT" | grep -q "VS Code + Antigravity Ext : true" || { echo "FAIL: pipe mode skipped detection"; exit 1; }
+echo "$PIPE_LOCAL_OUT" | grep -q "Done!" || { echo "FAIL: pipe mode exited early before Done!"; exit 1; }
+
+echo "[5/5] Testing Linux install.sh sandbox, safe merge & idempotency..."
 SANDBOX_HOME="$TMP_ROOT/sandbox_home"
 SANDBOX_WS="$TMP_ROOT/workspace"
 mkdir -p "$SANDBOX_HOME/.config/Code/User" "$SANDBOX_HOME/.vscode/extensions/google.antigravity-0.2.0" "$SANDBOX_WS"
